@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { Activity, BarChart3, Check, CheckCircle2, Circle, Flame, Heart, LayoutDashboard, ListTodo, Plus, Target } from 'lucide-react';
-const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-const key = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
-const db = url && key ? createClient(url, key) : null;
+// Public client configuration. Publishable keys are intended for browser use; protect data with Supabase RLS.
+const url = (import.meta.env.VITE_SUPABASE_URL as string | undefined) || 'https://dhwflteutqkkhmkegvbq.supabase.co';
+const key = (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined) || 'sb_publishable_C6ymTXrdu19UMXKweeDO-A_FWhqeEvJ';
+const db = createClient(url, key);
 type Habit = {id:string;title:string;category:string;done:boolean};
 type Task = {id:string;title:string;category:string;priority:string;done:boolean};
 type Mood = 'Great'|'Motivated'|'Okay'|'Stressed'|'Low';
@@ -15,8 +16,8 @@ export default function App(){
  const [page,setPage]=useState('Overview'),[habits,setHabits]=useState(habitSeed),[tasks,setTasks]=useState(taskSeed),[mood,setMood]=useState<Mood|null>(null),[note,setNote]=useState(''),[email,setEmail]=useState(''),[password,setPassword]=useState(''),[user,setUser]=useState(''),[message,setMessage]=useState(''),[newTask,setNewTask]=useState(''),[newHabit,setNewHabit]=useState('');
  useEffect(()=>{if(!db)return; db.auth.getSession().then(({data})=>{const u=data.session?.user;if(u){setUser(u.email||'');void load(u.id)}});const {data}=db.auth.onAuthStateChange((_e,s)=>{const u=s?.user;setUser(u?.email||'');if(u)window.setTimeout(()=>void load(u.id),0)});return()=>data.subscription.unsubscribe()},[]);
  async function load(id:string){if(!db)return;const [h,t,m]=await Promise.all([db.from('habits').select('*').eq('user_id',id).eq('log_date',day()),db.from('tasks').select('*').eq('user_id',id).eq('task_date',day()),db.from('mood_entries').select('*').eq('user_id',id).gte('created_at',day()+'T00:00:00').order('created_at',{ascending:false}).limit(1)]);if(h.data?.length)setHabits(h.data.map(x=>({id:x.id,title:x.title,category:x.category,done:x.done})));if(t.data?.length)setTasks(t.data.map(x=>({id:x.id,title:x.title,category:x.category,priority:x.priority,done:x.done})));if(m.data?.[0])setMood(m.data[0].mood)}
- async function saveHabit(h:Habit){setHabits(old=>old.map(x=>x.id===h.id?h:x));if(db&&user){const {data}=await db.auth.getUser();if(data.user)await db.from('habits').upsert({user_id:data.user.id,title:h.title,category:h.category,done:h.done,log_date:day()},{onConflict:'user_id,title,log_date'})}}
- async function saveTask(t:Task){setTasks(old=>old.map(x=>x.id===t.id?t:x));if(db&&user){const {data}=await db.auth.getUser();if(data.user)await db.from('tasks').upsert({user_id:data.user.id,title:t.title,category:t.category,priority:t.priority,done:t.done,task_date:day()},{onConflict:'user_id,title,task_date'})}}
+ async function saveHabit(h:Habit){setHabits(old=>old.some(x=>x.id===h.id)?old.map(x=>x.id===h.id?h:x):[...old,h]);if(db&&user){const {data}=await db.auth.getUser();if(data.user)await db.from('habits').upsert({user_id:data.user.id,title:h.title,category:h.category,done:h.done,log_date:day()},{onConflict:'user_id,title,log_date'})}}
+ async function saveTask(t:Task){setTasks(old=>old.some(x=>x.id===t.id)?old.map(x=>x.id===t.id?t:x):[...old,t]);if(db&&user){const {data}=await db.auth.getUser();if(data.user)await db.from('tasks').upsert({user_id:data.user.id,title:t.title,category:t.category,priority:t.priority,done:t.done,task_date:day()},{onConflict:'user_id,title,task_date'})}}
  async function auth(signup:boolean){if(!db){setMessage('Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in Vercel environment variables.');return}const r=signup?await db.auth.signUp({email,password}):await db.auth.signInWithPassword({email,password});setMessage(r.error?.message||(signup?'Check your email to confirm your account.':'Signed in.'))}
  async function logMood(v:Mood){setMood(v);if(db&&user){const {data}=await db.auth.getUser();if(data.user)await db.from('mood_entries').insert({user_id:data.user.id,mood:v,note})}}
  const done=habits.filter(x=>x.done).length,tdone=tasks.filter(x=>x.done).length,percent=habits.length?Math.round(done/habits.length*100):0;
