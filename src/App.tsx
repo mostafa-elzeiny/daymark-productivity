@@ -39,3 +39,4 @@ export default function App(){
  </>}
  <footer>daymark © {new Date().getFullYear()} <span>✦ Your growth, on your terms</span></footer></section></main></div>
 }
+// Deployment trigger: refresh Vercel from latest main.
